@@ -731,9 +731,11 @@ class PDFParser:
             oy0 = max(by0, fy0)
             ox1 = min(bx1, fx1)
             oy1 = min(by1, fy1)
-            o_area = max(0, (ox1 - ox0) * (oy1 - oy0))
-            if o_area / b_area >= overlap_threshold:
-                return True
+            # 必须两个方向都有重叠才算有效
+            if ox0 < ox1 and oy0 < oy1:
+                o_area = (ox1 - ox0) * (oy1 - oy0)
+                if o_area / b_area >= overlap_threshold:
+                    return True
         return False
 
     def _parse_page(self, page: fitz.Page, page_num: int) -> PageInfo:
