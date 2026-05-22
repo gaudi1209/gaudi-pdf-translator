@@ -1,5 +1,9 @@
 # 高迪 PDF 翻译工具
 
+<p align="center">
+  <img src="docs/img/web-ui.png" width="700" alt="Web 界面">
+</p>
+
 本地化 PDF 全文翻译工具，面向学术论文和技术文档设计。优先适配本地大模型（Ollama），同时支持 OpenAI 兼容 API（DeepSeek、智谱等）。
 
 ## 为什么需要它
@@ -73,6 +77,12 @@ pdf翻译/
     └── cache/
         └── translation_cache.db
 ```
+
+## 效果
+
+<p align="center">
+  <img src="docs/img/bilingual-sample.png" width="700" alt="中英对译样本">
+</p>
 
 ## License
 
