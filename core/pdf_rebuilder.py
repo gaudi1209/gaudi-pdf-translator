@@ -10,6 +10,110 @@ from typing import List, Optional
 from core.pdf_parser import PageInfo
 
 
+class TypesettingHelper:
+    """CJK 排版辅助工具"""
+
+    # 避头标点（不能出现在行首）
+    FORBIDDEN_LINE_START = set(
+        '，。！？、；：""''）》】〕〉」』'
+        '）！？。，；：…—～'
+        '．·'
+    )
+
+    # 避尾标点（不能出现在行尾）
+    FORBIDDEN_LINE_END = set(
+        '（《【〔〈「『'
+        '（'
+    )
+
+    # 字体映射
+    SERIF_FONTS_EN = {'times', 'georgia', 'palatino', 'garamond', 'minion',
+                      'bookman', 'cambria', 'plantin', 'sabon'}
+    SANS_FONTS_EN = {'arial', 'helvetica', 'frutiger', 'futura', 'gill',
+                     'univers', 'optima', 'segoe', 'calibri'}
+
+    FONT_PATHS = {
+        'sans': ['C:/Windows/Fonts/msyh.ttc', 'C:/Windows/Fonts/msyhbd.ttc'],
+        'serif': ['C:/Windows/Fonts/simsun.ttc', 'C:/Windows/Fonts/simfang.ttf'],
+        'sans_bold': ['C:/Windows/Fonts/msyhbd.ttc', 'C:/Windows/Fonts/msyh.ttc'],
+        'serif_bold': ['C:/Windows/Fonts/simhei.ttf', 'C:/Windows/Fonts/simsun.ttc'],
+    }
+
+    @staticmethod
+    def is_forbidden_at_line_start(char):
+        return char in TypesettingHelper.FORBIDDEN_LINE_START
+
+    @staticmethod
+    def is_forbidden_at_line_end(char):
+        return char in TypesettingHelper.FORBIDDEN_LINE_END
+
+    @staticmethod
+    def is_cjk(char):
+        return '\u4e00' <= char <= '\u9fff'
+
+    @staticmethod
+    def needs_cjk_latin_space(text):
+        for i in range(len(text) - 1):
+            c1, c2 = text[i], text[i + 1]
+            c1_cjk = '\u4e00' <= c1 <= '\u9fff'
+            c2_cjk = '\u4e00' <= c2 <= '\u9fff'
+            c1_lat = c1.isascii() and c1.isalpha()
+            c2_lat = c2.isascii() and c2.isalpha()
+            if (c1_cjk and c2_lat) or (c1_lat and c2_cjk):
+                return True
+        return False
+
+    def calculate_optimal_scale(self, text, box_width, box_height, original_size):
+        if not text or box_width <= 0 or box_height <= 0:
+            return 1.0
+
+        char_count = len(text)
+        cjk_count = sum(1 for c in text if self.is_cjk(c))
+        cjk_ratio = cjk_count / max(char_count, 1)
+        avg_char_width_ratio = cjk_ratio * 1.0 + (1 - cjk_ratio) * 0.55
+
+        line_height_ratio = 1.2
+        max_lines = max(1, int(box_height / (original_size * line_height_ratio)))
+
+        text_width = char_count * original_size * avg_char_width_ratio
+        available_width = box_width * max_lines
+
+        if text_width <= available_width:
+            return 1.0
+
+        scale = available_width / text_width
+        scaled_size = original_size * scale
+        scaled_line_height = scaled_size * line_height_ratio
+        actual_lines = text_width * scale / box_width
+        needed_height = actual_lines * scaled_line_height
+
+        if needed_height > box_height:
+            scale *= box_height / needed_height
+
+        return max(0.5, min(scale, 1.0))
+
+    def map_to_chinese_font(self, original_font):
+        font_lower = (original_font or "").lower().replace(' ', '')
+
+        bold = any(kw in font_lower for kw in ['bold', 'black', 'heavy', 'demi'])
+        is_serif = any(s in font_lower for s in self.SERIF_FONTS_EN)
+
+        style = 'serif' if is_serif else 'sans'
+        key = f"{style}_bold" if bold else style
+
+        for path in self.FONT_PATHS.get(key, self.FONT_PATHS['sans']):
+            if os.path.exists(path):
+                return {"style": style, "bold": bold, "path": path,
+                        "fontname": f"zh_{style}"}
+
+        for path in self.FONT_PATHS['sans']:
+            if os.path.exists(path):
+                return {"style": "sans", "bold": bold, "path": path,
+                        "fontname": "zh_sans"}
+
+        return {"style": "sans", "bold": bold, "path": None, "fontname": "zh_sans"}
+
+
 class PDFRebuilder:
     """PDF 重建器 - 使用微软雅黑字体实现中英文混排"""
 
@@ -129,6 +233,12 @@ class PDFRebuilder:
                 if not processed_text:
                     continue
 
+                # 根据原文字体选择中文字体
+                helper = TypesettingHelper()
+                font_map = helper.map_to_chinese_font(
+                    block.font_info.get("font", "")
+                )
+
                 font_size, line_height = self._calculate_font_and_lineheight(
                     processed_text,
                     rect.width,
@@ -136,53 +246,42 @@ class PDFRebuilder:
                     block.font_info.get("size", 11)
                 )
 
+                # 优先使用映射的字体，回退到默认字体
+                fontfile = font_map["path"] or self.font_path
+                fontname = font_map["fontname"]
+
                 try:
-                    # 使用嵌入字体时需要同时传递 fontfile
-                    if self.font_path and fontname == self.FONT_NAME:
-                        result = page.insert_textbox(
-                            rect,
-                            processed_text,
-                            fontsize=font_size,
-                            fontname=fontname,
-                            fontfile=self.font_path,
-                            color=(0, 0, 0),
-                            align=fitz.TEXT_ALIGN_LEFT,
-                            lineheight=line_height
-                        )
-                    else:
-                        result = page.insert_textbox(
-                            rect,
-                            processed_text,
-                            fontsize=font_size,
-                            fontname=fontname,
-                            color=(0, 0, 0),
-                            align=fitz.TEXT_ALIGN_LEFT,
-                            lineheight=line_height
-                        )
+                    # 先尝试嵌入映射的字体
+                    if fontfile:
+                        try:
+                            xref = page.insert_font(fontname=fontname, fontfile=fontfile)
+                        except:
+                            fontname = self.FONT_NAME
+                            fontfile = self.font_path
+
+                    result = page.insert_textbox(
+                        rect,
+                        processed_text,
+                        fontsize=font_size,
+                        fontname=fontname,
+                        fontfile=fontfile,
+                        color=(0, 0, 0),
+                        align=fitz.TEXT_ALIGN_LEFT,
+                        lineheight=line_height
+                    )
 
                     if result < 0:
                         smaller_font = max(6, font_size * 0.85)
-                        if self.font_path and fontname == self.FONT_NAME:
-                            page.insert_textbox(
-                                rect,
-                                processed_text,
-                                fontsize=smaller_font,
-                                fontname=fontname,
-                                fontfile=self.font_path,
-                                color=(0, 0, 0),
-                                align=fitz.TEXT_ALIGN_LEFT,
-                                lineheight=line_height
-                            )
-                        else:
-                            page.insert_textbox(
-                                rect,
-                                processed_text,
-                                fontsize=smaller_font,
-                                fontname=fontname,
-                                color=(0, 0, 0),
-                                align=fitz.TEXT_ALIGN_LEFT,
-                                lineheight=line_height
-                            )
+                        page.insert_textbox(
+                            rect,
+                            processed_text,
+                            fontsize=smaller_font,
+                            fontname=fontname,
+                            fontfile=fontfile,
+                            color=(0, 0, 0),
+                            align=fitz.TEXT_ALIGN_LEFT,
+                            lineheight=line_height
+                        )
 
                 except Exception as e:
                     print(f"插入文本失败 (block {block.id}): {e}")
@@ -199,38 +298,14 @@ class PDFRebuilder:
 
     def _calculate_font_and_lineheight(self, text: str, width: float, height: float,
                                         original_size: float) -> tuple:
-        """计算合适的字体大小和行距 - 尽量填满文本框"""
+        """计算合适的字体大小和行距 - 使用 TypesettingHelper 精确缩放"""
         if not text or width <= 0 or height <= 0:
             return 10, 1.2
 
-        char_count = len(text)
-        chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
-        chinese_ratio = chinese_chars / max(char_count, 1)
-
-        base_size = original_size
-        line_height_ratio = 1.15
-
-        avg_char_width = base_size * (chinese_ratio * 1.0 + (1 - chinese_ratio) * 0.55)
-        text_width = char_count * avg_char_width
-
-        line_height = base_size * line_height_ratio
-        max_lines = max(1, int(height / line_height))
-
-        width_per_line = width * max_lines
-
-        if text_width > width_per_line:
-            base_size *= width_per_line / text_width * 0.95
-
-        new_line_height = base_size * line_height_ratio
-        new_text_width = char_count * base_size * (chinese_ratio * 1.0 + (1 - chinese_ratio) * 0.55)
-        new_lines = max(1, (new_text_width / width) + 0.5)
-        needed_height = new_lines * new_line_height
-
-        if needed_height > height:
-            base_size *= height / needed_height * 0.95
-
-        final_size = max(8, min(base_size, original_size))
-        return final_size, line_height_ratio
+        helper = TypesettingHelper()
+        scale = helper.calculate_optimal_scale(text, width, height, original_size)
+        final_size = max(8, original_size * scale)
+        return final_size, 1.2
 
 
 class BilingualPDFRebuilder:
