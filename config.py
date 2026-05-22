@@ -32,6 +32,9 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 REDIS_HOST = 'localhost'
 REDIS_PORT = 6379
 
+# 翻译缓存
+TRANSLATION_CACHE_DIR = os.path.join(BASE_DIR, 'data', 'cache')
+
 
 def allowed_file(filename):
     """检查文件扩展名"""

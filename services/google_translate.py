@@ -153,9 +153,14 @@ class OllamaTranslateService:
 class ProtectedTranslator:
     """带公式保护的翻译器（使用 Ollama，自动检测语言）"""
 
-    def __init__(self, model='translategemma:27b'):
+    def __init__(self, model='translategemma:27b', cache_dir: str = None):
         self.translate_service = OllamaTranslateService(model=model)
         self.formula_protector = FormulaProtector()
+        self.model = model
+        self._cache = None
+        if cache_dir:
+            from services.translation_cache import TranslationCache
+            self._cache = TranslationCache(cache_dir)
 
     def _normalize_spaces(self, text: str) -> str:
         """规范化空格，只在列表项前保留换行"""
@@ -192,6 +197,12 @@ class ProtectedTranslator:
         if not text or not text.strip():
             return TranslationResult(original=text, translated=text, success=True)
 
+        # 缓存查询
+        if self._cache:
+            cached = self._cache.get(text, self.model)
+            if cached is not None:
+                return TranslationResult(original=text, translated=cached, success=True)
+
         # 1. 检测并保护公式
         protected_text, formulas = self.formula_protector.protect(text)
 
@@ -205,6 +216,10 @@ class ProtectedTranslator:
             )
             # 4. 规范化空格
             result.translated = self._normalize_spaces(result.translated)
+
+            # 5. 写入缓存
+            if self._cache:
+                self._cache.put(text, result.translated, self.model)
 
         return result
 
