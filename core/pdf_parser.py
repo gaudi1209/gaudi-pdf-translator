@@ -527,25 +527,30 @@ class PDFParser:
         匹配模式：
         - [1] Author, Title, Journal, 2012, pp. 100-110.
         - 1. Author, Title, Journal, 2012.
-        - 1 Author, Title...
+        - AUTHOR, I. 2012. Title. Journal.  (ACM/SIGGRAPH 格式)
         """
-        if not text or len(text) < 30:
+        if not text or len(text) < 20:
             return False
         text = text.strip()
-        # [数字] 开头
+
+        # 模式1：[数字] 开头
         if re.match(r'^\[\d+\]\s', text):
             return True
-        # 数字. 或 数字 空格 开头（如 "1. " 或 "1 "），后面跟大写字母或人名
+
+        # 模式2：数字. 或 数字 空格 开头
         if re.match(r'^\d{1,3}[.\s]\s*[A-Z]', text):
-            # 排除普通有序列表（如 "1. Introduction"）
-            # 参考文献条目通常包含年份、逗号分隔的作者等特征
             has_year = bool(re.search(r'\b(19|20)\d{2}\b', text))
             has_authors = bool(re.search(r'[A-Z][a-z]+,\s*[A-Z]', text))
             has_pages = bool(re.search(r'pp\.\s*\d+|pages?\s*\d+', text, re.IGNORECASE))
             has_journal = bool(re.search(r'\b(Journal|Proceedings|Conference|Transactions|Review|Press|Academic|Springer|Wiley|Elsevier|IEEE)\b', text, re.IGNORECASE))
             score = sum([has_year, has_authors, has_pages, has_journal])
-            # 至少满足2个特征，且包含逗号（引用条目一定有逗号分隔）
             return score >= 2 and ',' in text
+
+        # 模式3：AUTHOR, I. YEAR. 格式（ACM/SIGGRAPH 风格）
+        # 特征：大写字母缩写 + 年份 + 句号
+        if re.search(r'[A-Z]\.\s*(19|20)\d{2}\.', text) and len(text) > 40:
+            return True
+
         return False
 
     def _is_real_chapter_title(self, text: str, font_size: float) -> bool:
