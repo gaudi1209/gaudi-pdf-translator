@@ -405,16 +405,40 @@ class SectionDetector:
         self.toc_patterns_zh = [re.compile(p) for p in self.TOC_SECTIONS_ZH]
 
     def is_skip_section(self, title: str) -> bool:
-        """检测是否为需要跳过的章节（参考文献、附录等）"""
+        """检测是否为需要跳过的章节（参考文献、附录等）
+
+        支持两种匹配：
+        1. 整行匹配：title 就是章节名（如 "References"）
+        2. 开头匹配：title 以章节名开头（如 "REFERENCES [1] Author, ..."）
+        """
         if not title:
             return False
 
         title = title.strip()
-        title = re.sub(r'\s*\d+\s*$', '', title)
-        title = re.sub(r'\s*\.\.\..*$', '', title)
+        title_clean = re.sub(r'\s*\d+\s*$', '', title)
+        title_clean = re.sub(r'\s*\.\.\..*$', '', title_clean)
+
+        # 取第一个单词/短语作为标题检测
+        first_word = re.split(r'[\s\[\(]', title_clean, 1)[0]  # "REFERENCES" from "REFERENCES [1]..."
+        first_line = title_clean.split('\n')[0].strip()
+
+        # 如果第一个单词后面紧跟更多文本（非标题格式），需要更严格匹配
+        # 如 "Note that the residual..." 不应匹配 "Notes"
+        # 但 "REFERENCES [1] Author..." 应匹配 "References"（关键词后紧跟 [数字]）
+        is_short_title = len(title_clean) <= 30
+        first_keyword = re.match(r'^([A-Za-z]+)\s', title_clean)
+        keyword_only = first_keyword.group(1) if first_keyword else first_word
+        # 关键词后紧跟 [数字] 是参考文献格式的强特征
+        has_ref_number = bool(re.match(r'^[A-Za-z]+\s+\[\d+\]', title_clean))
 
         for pattern in self.patterns_en:
-            if pattern.match(title):
+            if pattern.match(title_clean) or pattern.match(first_line):
+                return True
+            # 短标题直接匹配关键词
+            if is_short_title and pattern.match(keyword_only):
+                return True
+            # 关键词 + [数字] 格式（如 "REFERENCES [1] ..."）
+            if has_ref_number and pattern.match(keyword_only):
                 return True
         for pattern in self.patterns_zh:
             if pattern.match(title):
@@ -495,6 +519,34 @@ class PDFParser:
         'about the author', 'about the authors', 'author biography',
         '致谢', '前言', '序言', '作者简介',
     ]
+
+    @staticmethod
+    def _is_reference_entry(text: str) -> bool:
+        """检测是否为参考文献条目格式
+
+        匹配模式：
+        - [1] Author, Title, Journal, 2012, pp. 100-110.
+        - 1. Author, Title, Journal, 2012.
+        - 1 Author, Title...
+        """
+        if not text or len(text) < 30:
+            return False
+        text = text.strip()
+        # [数字] 开头
+        if re.match(r'^\[\d+\]\s', text):
+            return True
+        # 数字. 或 数字 空格 开头（如 "1. " 或 "1 "），后面跟大写字母或人名
+        if re.match(r'^\d{1,3}[.\s]\s*[A-Z]', text):
+            # 排除普通有序列表（如 "1. Introduction"）
+            # 参考文献条目通常包含年份、逗号分隔的作者等特征
+            has_year = bool(re.search(r'\b(19|20)\d{2}\b', text))
+            has_authors = bool(re.search(r'[A-Z][a-z]+,\s*[A-Z]', text))
+            has_pages = bool(re.search(r'pp\.\s*\d+|pages?\s*\d+', text, re.IGNORECASE))
+            has_journal = bool(re.search(r'\b(Journal|Proceedings|Conference|Transactions|Review|Press|Academic|Springer|Wiley|Elsevier|IEEE)\b', text, re.IGNORECASE))
+            score = sum([has_year, has_authors, has_pages, has_journal])
+            # 至少满足2个特征，且包含逗号（引用条目一定有逗号分隔）
+            return score >= 2 and ',' in text
+        return False
 
     def _is_real_chapter_title(self, text: str, font_size: float) -> bool:
         """判断是否是真正的章节标题（而非目录条目）
@@ -969,6 +1021,12 @@ class PDFParser:
                     print(f"  检测到参考文献关键词但位置靠前，不触发永久跳过 (页{page_num+1}/{total_pages}): {full_text[:50]}...")
                     block_type = BlockType.REFERENCES
                     should_translate = False  # 这个块本身不翻译，但不影响后续页面
+            elif not self._in_skip_section and page_progress > 0.7 and self._is_reference_entry(full_text):
+                # 文档后30%，检测到连续引用条目格式（[1], [2]...），自动进入参考文献模式
+                self._in_skip_section = True
+                block_type = BlockType.REFERENCES
+                should_translate = False
+                print(f"  检测到引用条目格式，进入参考文献区域 (页{page_num+1}/{total_pages}): {full_text[:50]}...")
             elif block_type == BlockType.HEADER:
                 # 检查是否进入目录区域（只有在非参考文献区域时才检测目录）
                 if not self._in_skip_section and self.section_detector.is_toc_section(full_text):
