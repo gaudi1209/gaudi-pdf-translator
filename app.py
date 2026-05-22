@@ -43,6 +43,19 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/api/translation-config')
+def get_translation_config():
+    """获取翻译服务配置"""
+    return jsonify({
+        'service': TRANSLATION_SERVICE,
+        'ollama_model': OLLAMA_MODEL,
+        'ollama_url': OLLAMA_URL,
+        'openai_model': OPENAI_MODEL,
+        'openai_base_url': OPENAI_BASE_URL,
+        'has_api_key': bool(OPENAI_API_KEY)  # 不返回实际 key
+    })
+
+
 @app.route('/api/upload', methods=['POST'])
 def upload():
     """上传 PDF 文件"""
@@ -121,11 +134,29 @@ def start_translation(task_id):
                         tasks[task_id]['progress'] = progress.to_dict()
                         tasks[task_id]['status'] = progress.status.value
 
+            # 构建翻译配置
+            translation_config = None
+            translation_service = data.get('translation_service', None)
+            if translation_service == 'openai':
+                translation_config = {
+                    'service': 'openai',
+                    'model': data.get('openai_model', OPENAI_MODEL),
+                    'base_url': data.get('openai_base_url', OPENAI_BASE_URL),
+                    'api_key': data.get('openai_api_key', OPENAI_API_KEY),
+                }
+            elif translation_service == 'ollama':
+                translation_config = {
+                    'service': 'ollama',
+                    'model': data.get('ollama_model', OLLAMA_MODEL),
+                    'base_url': data.get('ollama_url', OLLAMA_URL),
+                }
+
             processor = PDFTranslationProcessor(
                 task['filepath'],
                 output_path,
                 max_workers=max_workers,
-                data_dir=DATA_FOLDER
+                data_dir=DATA_FOLDER,
+                translation_config=translation_config
             )
             processor.set_progress_callback(progress_callback)
             processor.process(task_id=task_id)  # 传递task_id支持断点续传

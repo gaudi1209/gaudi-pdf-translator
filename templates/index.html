@@ -271,6 +271,29 @@
             border-color: #4a90a4;
         }
 
+        /* 引擎按钮 */
+        .engine-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            color: #666;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .engine-btn:hover {
+            background-color: #f0f0f0;
+        }
+
+        .engine-btn.active {
+            background-color: #4a90a4;
+            color: white;
+            border-color: #4a90a4;
+        }
+
         /* 进度区域 */
         .progress-header {
             display: flex;
@@ -675,6 +698,57 @@
                 </div>
             </div>
 
+            <!-- 翻译引擎配置 -->
+            <div style="margin-top: 20px; background-color: #f5f5f5; padding: 16px; border-radius: 6px; margin-bottom: 16px;">
+                <label style="display: block; font-size: 14px; color: #333; margin-bottom: 8px; font-weight: 500;">
+                    翻译引擎
+                </label>
+                <div style="display: flex; gap: 5px; margin-bottom: 12px;">
+                    <button class="engine-btn active" data-engine="ollama" onclick="selectEngine('ollama')">
+                        Ollama (本地)
+                    </button>
+                    <button class="engine-btn" data-engine="openai" onclick="selectEngine('openai')">
+                        OpenAI 兼容 API
+                    </button>
+                </div>
+
+                <!-- Ollama 配置 -->
+                <div id="ollamaConfig">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label style="font-size: 13px; color: #666; min-width: 50px;">模型:</label>
+                        <input type="text" id="ollamaModel" value="translategemma:27b"
+                            style="flex:1; padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+                        <label style="font-size: 13px; color: #666; min-width: 50px;">地址:</label>
+                        <input type="text" id="ollamaUrl" value="http://localhost:11434"
+                            style="flex:1; padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                    </div>
+                </div>
+
+                <!-- OpenAI 配置 -->
+                <div id="openaiConfig" style="display: none;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label style="font-size: 13px; color: #666; min-width: 80px;">API 地址:</label>
+                        <input type="text" id="openaiBaseUrl" value="https://api.openai.com/v1"
+                            style="flex:1; padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+                        <label style="font-size: 13px; color: #666; min-width: 80px;">API Key:</label>
+                        <input type="password" id="openaiApiKey" placeholder="sk-..."
+                            style="flex:1; padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+                        <label style="font-size: 13px; color: #666; min-width: 80px;">模型:</label>
+                        <input type="text" id="openaiModel" value="gpt-4o-mini"
+                            style="flex:1; padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
+                    </div>
+                    <div style="margin-top: 8px; font-size: 12px; color: #999;">
+                        支持 OpenAI / DeepSeek / 智谱 / 任意 OpenAI 兼容端点
+                    </div>
+                </div>
+            </div>
+
             <div class="thread-selector" style="margin-top: 20px;">
                 <label>并行线程数</label>
                 <div class="thread-btns">
@@ -755,6 +829,17 @@
         let currentTaskId = null;
         let progressInterval = null;
         let threadCount = 10;
+        let selectedEngine = 'ollama';
+
+        // 引擎切换
+        function selectEngine(engine) {
+            selectedEngine = engine;
+            document.querySelectorAll('.engine-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.engine-btn[data-engine="${engine}"]`).classList.add('active');
+
+            document.getElementById('ollamaConfig').style.display = engine === 'ollama' ? 'block' : 'none';
+            document.getElementById('openaiConfig').style.display = engine === 'openai' ? 'block' : 'none';
+        }
 
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
@@ -852,11 +937,26 @@
         document.getElementById('startBtn').addEventListener('click', async () => {
             if (!currentTaskId) return;
 
+            // 收集翻译配置
+            const translateBody = {
+                max_workers: threadCount,
+                translation_service: selectedEngine
+            };
+
+            if (selectedEngine === 'ollama') {
+                translateBody.ollama_model = document.getElementById('ollamaModel').value;
+                translateBody.ollama_url = document.getElementById('ollamaUrl').value;
+            } else {
+                translateBody.openai_model = document.getElementById('openaiModel').value;
+                translateBody.openai_base_url = document.getElementById('openaiBaseUrl').value;
+                translateBody.openai_api_key = document.getElementById('openaiApiKey').value;
+            }
+
             try {
                 const response = await fetch(`/api/translate/${currentTaskId}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({max_workers: threadCount})
+                    body: JSON.stringify(translateBody)
                 });
                 const data = await response.json();
 

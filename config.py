@@ -32,6 +32,16 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 REDIS_HOST = 'localhost'
 REDIS_PORT = 6379
 
+# 翻译服务配置
+TRANSLATION_SERVICE = "ollama"          # "ollama" 或 "openai"
+OLLAMA_MODEL = "translategemma:27b"
+OLLAMA_URL = "http://localhost:11434"
+
+# OpenAI 兼容配置（也适用于 DeepSeek, vLLM 等）
+OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
+OPENAI_API_KEY = ""
+
 # 翻译缓存
 TRANSLATION_CACHE_DIR = os.path.join(BASE_DIR, 'data', 'cache')
 

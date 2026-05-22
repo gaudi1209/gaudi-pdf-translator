@@ -228,12 +228,43 @@ class ProtectedTranslator:
 _translator_instance = None
 
 
-def get_translator() -> ProtectedTranslator:
-    """获取翻译器单例"""
+def get_translator(service=None, **kwargs) -> ProtectedTranslator:
+    """获取翻译器（根据配置选择翻译服务）
+
+    Args:
+        service: 翻译服务类型 "ollama" 或 "openai"，None 时使用配置
+        **kwargs: 覆盖配置的参数 (model, base_url, api_key, cache_dir)
+    """
     global _translator_instance
-    if _translator_instance is None:
-        _translator_instance = ProtectedTranslator()
-    return _translator_instance
+
+    from config import (TRANSLATION_SERVICE, OLLAMA_MODEL, OLLAMA_URL,
+                        OPENAI_MODEL, OPENAI_BASE_URL, OPENAI_API_KEY,
+                        TRANSLATION_CACHE_DIR)
+
+    svc_type = service or TRANSLATION_SERVICE
+    cache_dir = kwargs.get('cache_dir', TRANSLATION_CACHE_DIR)
+
+    if svc_type == "openai":
+        model = kwargs.get('model', OPENAI_MODEL)
+        base_url = kwargs.get('base_url', OPENAI_BASE_URL)
+        api_key = kwargs.get('api_key', OPENAI_API_KEY)
+
+        from services.openai_translate import OpenAITranslateService
+        translate_svc = OpenAITranslateService(
+            model=model, base_url=base_url, api_key=api_key
+        )
+        translator = ProtectedTranslator(model=model, cache_dir=cache_dir)
+        translator.translate_service = translate_svc
+        return translator
+    else:
+        model = kwargs.get('model', OLLAMA_MODEL)
+        ollama_url = kwargs.get('base_url', OLLAMA_URL)
+
+        from services.google_translate import OllamaTranslateService
+        translate_svc = OllamaTranslateService(model=model, ollama_url=ollama_url)
+        translator = ProtectedTranslator(model=model, cache_dir=cache_dir)
+        translator.translate_service = translate_svc
+        return translator
 
 
 def translate_text(text: str) -> TranslationResult:

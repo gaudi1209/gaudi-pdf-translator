@@ -93,7 +93,8 @@ class PDFTranslationProcessor:
                  input_path: str,
                  output_path: str,
                  max_workers: int = 10,
-                 data_dir: str = None):
+                 data_dir: str = None,
+                 translation_config=None):
         self.input_path = input_path
         self.output_path = output_path
         self.max_workers = max_workers
@@ -102,9 +103,16 @@ class PDFTranslationProcessor:
         self.parser = None
         self.pages_info: List[PageInfo] = []
         self.chapters: List[ChapterInfo] = []
-        # 缓存目录与 data_dir 同级
+
+        # 翻译配置
         cache_dir = os.path.join(os.path.dirname(self.data_dir), 'cache') if self.data_dir else None
-        self.translator = ProtectedTranslator(cache_dir=cache_dir)
+        if translation_config:
+            from services.google_translate import get_translator
+            config = dict(translation_config)
+            config['cache_dir'] = cache_dir
+            self.translator = get_translator(**config)
+        else:
+            self.translator = ProtectedTranslator(cache_dir=cache_dir)
 
         self.progress_callback: Optional[Callable] = None
         self.status = ProcessingStatus.PENDING
