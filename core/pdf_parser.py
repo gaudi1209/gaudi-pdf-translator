@@ -657,6 +657,27 @@ class PDFParser:
         print(f"  需翻译: {translate_counts['yes']}")
         print(f"  跳过: {translate_counts['no']}")
 
+    @staticmethod
+    def _is_inside_figure(bbox, figure_regions, overlap_threshold=0.6):
+        """检查文本块是否在图片区域内（重叠超过阈值则跳过）"""
+        if not figure_regions or not bbox:
+            return False
+        bx0, by0, bx1, by1 = bbox
+        b_area = max(0, (bx1 - bx0) * (by1 - by0))
+        if b_area <= 0:
+            return False
+
+        for fx0, fy0, fx1, fy1 in figure_regions:
+            # 计算重叠区域
+            ox0 = max(bx0, fx0)
+            oy0 = max(by0, fy0)
+            ox1 = min(bx1, fx1)
+            oy1 = min(by1, fy1)
+            o_area = max(0, (ox1 - ox0) * (oy1 - oy0))
+            if o_area / b_area >= overlap_threshold:
+                return True
+        return False
+
     def _parse_page(self, page: fitz.Page, page_num: int) -> PageInfo:
         """解析单页 - 按 block 创建 TextBlock"""
         blocks = []
@@ -684,6 +705,25 @@ class PDFParser:
                 self._non_toc_page_count = 0
 
         text_dict = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
+
+        # 收集图片区域（用于跳过图纸中的文字）
+        figure_regions = []
+        for block in text_dict.get("blocks", []):
+            if block.get("type") == 1:  # 图片块
+                bbox = block.get("bbox", (0, 0, 0, 0))
+                figure_regions.append(bbox)
+        # 也从 page images 收集
+        image_list = page.get_images(full=True)
+        for img_info in image_list[:50]:
+            xref = img_info[0]
+            try:
+                img_rects = page.get_image_rects(xref)
+                for rect in img_rects:
+                    bbox = (rect.x0, rect.y0, rect.x1, rect.y1)
+                    # 扩大 5pt 边距，覆盖图纸边缘标注
+                    figure_regions.append((bbox[0] - 5, bbox[1] - 5, bbox[2] + 5, bbox[3] + 5))
+            except Exception:
+                pass
 
         block_idx = 0
         for block in text_dict.get("blocks", []):
@@ -738,9 +778,17 @@ class PDFParser:
             if not full_text_parts:
                 continue
 
+            # 跳过小字（字号小于阈值的文本块不翻译，通常是注释/标注）
+            from config import MIN_FONT_SIZE_TO_TRANSLATE
+            if font_info["size"] < MIN_FONT_SIZE_TO_TRANSLATE:
+                continue
+
             full_text = " ".join(full_text_parts)
 
-            # 记录数学字体 span 在 full_text 中的位置（用于行内公式保护）
+            # 跳过与图片区域重叠的文本块（图纸中的文字/符号）
+            block_bbox_tuple = block_bbox if isinstance(block_bbox, tuple) else tuple(block_bbox)
+            if self._is_inside_figure(block_bbox_tuple, figure_regions):
+                continue
             formula_span_ranges = []
             search_start = 0
             for line in lines:

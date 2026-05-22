@@ -37,10 +37,16 @@ TRANSLATION_SERVICE = "ollama"          # "ollama" 或 "openai"
 OLLAMA_MODEL = "translategemma:27b"
 OLLAMA_URL = "http://localhost:11434"
 
-# OpenAI 兼容配置（也适用于 DeepSeek, vLLM 等）
-OPENAI_MODEL = "gpt-4o-mini"
-OPENAI_BASE_URL = "https://api.openai.com/v1"
+# OpenAI 兼容配置（默认 DeepSeek）
+OPENAI_MODEL = "deepseek-v4-flash"
+OPENAI_BASE_URL = "https://api.deepseek.com"
 OPENAI_API_KEY = ""
+
+# 用户设置持久化
+SETTINGS_FILE = os.path.join(BASE_DIR, 'data', 'settings.json')
+
+# 小字跳过阈值（字号小于此值的文本块不翻译）
+MIN_FONT_SIZE_TO_TRANSLATE = 7.0
 
 # 翻译缓存
 TRANSLATION_CACHE_DIR = os.path.join(BASE_DIR, 'data', 'cache')
@@ -53,5 +59,42 @@ def allowed_file(filename):
 
 def ensure_dirs():
     """确保所有必要目录存在"""
-    for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER, TEMP_FOLDER, DATA_FOLDER]:
+    for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER, TEMP_FOLDER, DATA_FOLDER, TRANSLATION_CACHE_DIR]:
         os.makedirs(folder, exist_ok=True)
+
+
+import json
+
+DEFAULT_SETTINGS = {
+    "engine": "ollama",
+    "ollama_model": OLLAMA_MODEL,
+    "ollama_url": OLLAMA_URL,
+    "openai_model": OPENAI_MODEL,
+    "openai_base_url": OPENAI_BASE_URL,
+    "openai_api_key": "",
+}
+
+def load_settings():
+    """从文件加载用户设置"""
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                saved = json.load(f)
+            # 合并默认值（防止缺少新字段）
+            result = dict(DEFAULT_SETTINGS)
+            result.update(saved)
+            return result
+        except Exception:
+            pass
+    return dict(DEFAULT_SETTINGS)
+
+def save_settings(settings: dict):
+    """保存用户设置到文件"""
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+    # 只保存已知字段
+    data = {}
+    for key in DEFAULT_SETTINGS:
+        if key in settings:
+            data[key] = settings[key]
+    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)

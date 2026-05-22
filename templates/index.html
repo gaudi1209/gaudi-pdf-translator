@@ -699,7 +699,7 @@
             <div id="openaiConfig" style="display: none;">
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <label style="font-size: 13px; color: #666; min-width: 80px;">API 地址:</label>
-                    <input type="text" id="openaiBaseUrl" value="https://api.openai.com/v1"
+                    <input type="text" id="openaiBaseUrl" value="https://api.deepseek.com"
                         style="flex:1; padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
@@ -709,7 +709,7 @@
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
                     <label style="font-size: 13px; color: #666; min-width: 80px;">模型:</label>
-                    <input type="text" id="openaiModel" value="gpt-4o-mini"
+                    <input type="text" id="openaiModel" value="deepseek-v4-flash"
                         style="flex:1; padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 13px;">
                 </div>
                 <div style="margin-top: 8px; font-size: 12px; color: #999;">
@@ -839,7 +839,50 @@
 
             document.getElementById('ollamaConfig').style.display = engine === 'ollama' ? 'block' : 'none';
             document.getElementById('openaiConfig').style.display = engine === 'openai' ? 'block' : 'none';
+            autoSaveSettings();
         }
+
+        // 自动保存设置
+        function autoSaveSettings() {
+            const settings = {
+                engine: selectedEngine,
+                ollama_model: document.getElementById('ollamaModel').value,
+                ollama_url: document.getElementById('ollamaUrl').value,
+                openai_model: document.getElementById('openaiModel').value,
+                openai_base_url: document.getElementById('openaiBaseUrl').value,
+                openai_api_key: document.getElementById('openaiApiKey').value,
+            };
+            fetch('/api/save-settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(settings)
+            });
+        }
+
+        // 页面加载时读取保存的设置
+        async function loadSavedSettings() {
+            try {
+                const resp = await fetch('/api/translation-config');
+                const cfg = await resp.json();
+                // 恢复引擎选择
+                selectEngine(cfg.engine || 'ollama');
+                // 恢复 Ollama 配置
+                document.getElementById('ollamaModel').value = cfg.ollama_model || 'translategemma:27b';
+                document.getElementById('ollamaUrl').value = cfg.ollama_url || 'http://localhost:11434';
+                // 恢复 OpenAI 配置
+                document.getElementById('openaiBaseUrl').value = cfg.openai_base_url || 'https://api.deepseek.com';
+                document.getElementById('openaiApiKey').value = cfg.openai_api_key || '';
+                document.getElementById('openaiModel').value = cfg.openai_model || 'deepseek-v4-flash';
+            } catch (e) {
+                console.error('加载设置失败:', e);
+            }
+        }
+        loadSavedSettings();
+
+        // 输入框变化时自动保存
+        ['ollamaModel', 'ollamaUrl', 'openaiBaseUrl', 'openaiApiKey', 'openaiModel'].forEach(id => {
+            document.getElementById(id).addEventListener('change', autoSaveSettings);
+        });
 
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');

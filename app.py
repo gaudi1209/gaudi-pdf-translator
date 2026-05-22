@@ -21,6 +21,7 @@ import fitz
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import *
+from config import load_settings, save_settings
 from core.processor import PDFTranslationProcessor, ProcessingStatus
 
 # 确保目录存在
@@ -45,15 +46,24 @@ def index():
 
 @app.route('/api/translation-config')
 def get_translation_config():
-    """获取翻译服务配置"""
+    """获取翻译服务配置（从持久化设置中读取）"""
+    settings = load_settings()
     return jsonify({
-        'service': TRANSLATION_SERVICE,
-        'ollama_model': OLLAMA_MODEL,
-        'ollama_url': OLLAMA_URL,
-        'openai_model': OPENAI_MODEL,
-        'openai_base_url': OPENAI_BASE_URL,
-        'has_api_key': bool(OPENAI_API_KEY)  # 不返回实际 key
+        'engine': settings.get('engine', 'ollama'),
+        'ollama_model': settings.get('ollama_model', OLLAMA_MODEL),
+        'ollama_url': settings.get('ollama_url', OLLAMA_URL),
+        'openai_model': settings.get('openai_model', OPENAI_MODEL),
+        'openai_base_url': settings.get('openai_base_url', OPENAI_BASE_URL),
+        'openai_api_key': settings.get('openai_api_key', ''),
     })
+
+
+@app.route('/api/save-settings', methods=['POST'])
+def api_save_settings():
+    """保存翻译引擎设置"""
+    data = request.get_json() or {}
+    save_settings(data)
+    return jsonify({'success': True})
 
 
 @app.route('/api/upload', methods=['POST'])
@@ -134,21 +144,23 @@ def start_translation(task_id):
                         tasks[task_id]['progress'] = progress.to_dict()
                         tasks[task_id]['status'] = progress.status.value
 
-            # 构建翻译配置
+            # 构建翻译配置（从前端传入 + 持久化设置合并）
+            settings = load_settings()
+            translation_service = data.get('translation_service', settings.get('engine', 'ollama'))
+
             translation_config = None
-            translation_service = data.get('translation_service', None)
             if translation_service == 'openai':
                 translation_config = {
                     'service': 'openai',
-                    'model': data.get('openai_model', OPENAI_MODEL),
-                    'base_url': data.get('openai_base_url', OPENAI_BASE_URL),
-                    'api_key': data.get('openai_api_key', OPENAI_API_KEY),
+                    'model': data.get('openai_model') or settings.get('openai_model', OPENAI_MODEL),
+                    'base_url': data.get('openai_base_url') or settings.get('openai_base_url', OPENAI_BASE_URL),
+                    'api_key': data.get('openai_api_key') or settings.get('openai_api_key', ''),
                 }
             elif translation_service == 'ollama':
                 translation_config = {
                     'service': 'ollama',
-                    'model': data.get('ollama_model', OLLAMA_MODEL),
-                    'base_url': data.get('ollama_url', OLLAMA_URL),
+                    'model': data.get('ollama_model') or settings.get('ollama_model', OLLAMA_MODEL),
+                    'base_url': data.get('ollama_url') or settings.get('ollama_url', OLLAMA_URL),
                 }
 
             processor = PDFTranslationProcessor(
