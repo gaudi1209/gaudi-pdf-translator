@@ -23,9 +23,9 @@
 7. **断点续传** — 页面级别进度跟踪，中断后可继续翻译
 8. **轻量部署** — 仅依赖 Flask + PyMuPDF + requests，无需 Redis/Celery
 
-## 与 BabelDOC 的区别
+## 与 [BabelDOC](https://github.com/funstory-ai/BabelDOC) 的区别
 
-本工具受 BabelDOC 启发，借鉴了其排版算法和 API 设计思路，但有不同定位：
+本工具受 [BabelDOC](https://github.com/funstory-ai/BabelDOC) 启发，借鉴了其排版算法和 API 设计思路，但有不同定位：
 
 | | 本工具 | BabelDOC |
 |---|---|---|
