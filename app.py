@@ -163,12 +163,15 @@ def start_translation(task_id):
                     'base_url': data.get('ollama_url') or settings.get('ollama_url', OLLAMA_URL),
                 }
 
+            ignore_cache = data.get('ignore_cache', False)
+
             processor = PDFTranslationProcessor(
                 task['filepath'],
                 output_path,
                 max_workers=max_workers,
                 data_dir=DATA_FOLDER,
-                translation_config=translation_config
+                translation_config=translation_config,
+                ignore_cache=ignore_cache
             )
             processor.set_progress_callback(progress_callback)
             processor.process(task_id=task_id)  # 传递task_id支持断点续传

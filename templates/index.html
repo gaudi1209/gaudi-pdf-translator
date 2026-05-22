@@ -758,6 +758,11 @@
                 </div>
             </div>
 
+            <label style="display: flex; align-items: center; gap: 6px; margin-bottom: 12px; cursor: pointer; font-size: 13px; color: #666;">
+                <input type="checkbox" id="ignoreCache" style="margin: 0;">
+                强制重翻（忽略翻译缓存）
+            </label>
+
             <button class="btn btn-success" style="width: 100%;" id="startBtn">开始翻译</button>
         </div>
 
@@ -983,7 +988,8 @@
             // 收集翻译配置
             const translateBody = {
                 max_workers: threadCount,
-                translation_service: selectedEngine
+                translation_service: selectedEngine,
+                ignore_cache: document.getElementById('ignoreCache').checked
             };
 
             if (selectedEngine === 'ollama') {

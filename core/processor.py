@@ -94,7 +94,8 @@ class PDFTranslationProcessor:
                  output_path: str,
                  max_workers: int = 10,
                  data_dir: str = None,
-                 translation_config=None):
+                 translation_config=None,
+                 ignore_cache: bool = False):
         self.input_path = input_path
         self.output_path = output_path
         self.max_workers = max_workers
@@ -106,6 +107,8 @@ class PDFTranslationProcessor:
 
         # 翻译配置
         cache_dir = os.path.join(os.path.dirname(self.data_dir), 'cache') if self.data_dir else None
+        if ignore_cache:
+            cache_dir = None  # 不使用缓存
         if translation_config:
             from services.google_translate import get_translator
             config = dict(translation_config)
