@@ -52,6 +52,7 @@ class PageInfo:
     height: float
     blocks: List[TextBlock] = field(default_factory=list)
     chapter_title: Optional[str] = None  # 章节标题（如果有）
+    figure_regions: List[tuple] = field(default_factory=list)  # 图片区域 [(x0,y0,x1,y1), ...]
 
 
 @dataclass
@@ -965,7 +966,8 @@ class PDFParser:
             page_num=page_num,
             width=page.rect.width,
             height=page.rect.height,
-            blocks=blocks
+            blocks=blocks,
+            figure_regions=figure_regions
         )
 
     def _create_figure_block(self, block: Dict, page_num: int, idx: int) -> TextBlock:

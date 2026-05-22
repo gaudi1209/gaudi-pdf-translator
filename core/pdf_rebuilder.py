@@ -125,6 +125,54 @@ class PDFRebuilder:
         self.output_path = output_path
         self.font_path = self._find_font()
 
+    @staticmethod
+    def _bbox_overlap_with_figures(bbox, figure_regions, threshold=0.1):
+        """检查 bbox 是否与图片区域有重叠
+
+        判定条件（满足任一即跳过）：
+        1. 重叠面积占文本块面积 > 10%
+        2. 文本块中心点在图片区域内
+
+        Args:
+            bbox: 文本块坐标 (x0, y0, x1, y1)
+            figure_regions: 图片区域列表 [(x0, y0, x1, y1), ...]
+            threshold: 重叠面积比例阈值
+
+        Returns:
+            True 表示应跳过该文本块
+        """
+        if not figure_regions:
+            return False
+
+        bx0, by0, bx1, by1 = bbox
+        b_area = (bx1 - bx0) * (by1 - by0)
+        if b_area <= 0:
+            return False
+
+        # 文本块中心点
+        cx = (bx0 + bx1) / 2
+        cy = (by0 + by1) / 2
+
+        for fig in figure_regions:
+            fx0, fy0, fx1, fy1 = fig
+
+            # 条件2：中心点在图片内
+            if fx0 <= cx <= fx1 and fy0 <= cy <= fy1:
+                return True
+
+            # 条件1：面积重叠 > 10%
+            ix0 = max(bx0, fx0)
+            iy0 = max(by0, fy0)
+            ix1 = min(bx1, fx1)
+            iy1 = min(by1, fy1)
+
+            if ix0 < ix1 and iy0 < iy1:
+                overlap_area = (ix1 - ix0) * (iy1 - iy0)
+                if overlap_area / b_area > threshold:
+                    return True
+
+        return False
+
     def _find_font(self) -> Optional[str]:
         """查找可用字体"""
         fonts = [
@@ -200,18 +248,30 @@ class PDFRebuilder:
             if not blocks_to_translate:
                 continue
 
-            blocks_to_translate.sort(key=lambda b: (b.bbox[1], b.bbox[0]))
+            # 获取当前页的图片区域
+            page_figures = getattr(page_info, 'figure_regions', [])
+
+            # 过滤掉与图片区域重叠的文本块（保护图纸内的文字）
+            safe_blocks = []
+            for block in blocks_to_translate:
+                if page_figures and self._bbox_overlap_with_figures(block.bbox, page_figures):
+                    continue  # 跳过，不碰图纸区域内的文字
+                safe_blocks.append(block)
+
+            if not safe_blocks:
+                continue
+
+            safe_blocks.sort(key=lambda b: (b.bbox[1], b.bbox[0]))
 
             # 使用redact方法覆盖原文
             redacted_blocks = []
-            for block in blocks_to_translate:
+            for block in safe_blocks:
                 rect = fitz.Rect(block.bbox)
                 try:
                     page.add_redact_annot(rect, fill=(1, 1, 1))
                     redacted_blocks.append(block)
                 except Exception as e:
                     print(f"添加涂黑失败 (page {page_num}, block {block.id}): {e}")
-                    # 如果redact失败，使用白色矩形
                     try:
                         page.draw_rect(rect, color=(1, 1, 1), fill=(1, 1, 1))
                         redacted_blocks.append(block)
@@ -233,12 +293,6 @@ class PDFRebuilder:
                 if not processed_text:
                     continue
 
-                # 根据原文字体选择中文字体
-                helper = TypesettingHelper()
-                font_map = helper.map_to_chinese_font(
-                    block.font_info.get("font", "")
-                )
-
                 font_size, line_height = self._calculate_font_and_lineheight(
                     processed_text,
                     rect.width,
@@ -246,45 +300,62 @@ class PDFRebuilder:
                     block.font_info.get("size", 11)
                 )
 
-                # 优先使用映射的字体，回退到默认字体
+                # 尝试字体映射，失败回退到默认字体
+                helper = TypesettingHelper()
+                font_map = helper.map_to_chinese_font(
+                    block.font_info.get("font", "")
+                )
                 fontfile = font_map["path"] or self.font_path
                 fontname = font_map["fontname"]
 
+                # 多次重试策略
+                inserted = False
+
+                # 第一次：映射字体
                 try:
-                    # 先尝试嵌入映射的字体
                     if fontfile:
                         try:
-                            xref = page.insert_font(fontname=fontname, fontfile=fontfile)
+                            page.insert_font(fontname=fontname, fontfile=fontfile)
                         except:
                             fontname = self.FONT_NAME
                             fontfile = self.font_path
 
                     result = page.insert_textbox(
-                        rect,
-                        processed_text,
-                        fontsize=font_size,
-                        fontname=fontname,
-                        fontfile=fontfile,
-                        color=(0, 0, 0),
-                        align=fitz.TEXT_ALIGN_LEFT,
+                        rect, processed_text, fontsize=font_size,
+                        fontname=fontname, fontfile=fontfile,
+                        color=(0, 0, 0), align=fitz.TEXT_ALIGN_LEFT,
                         lineheight=line_height
                     )
+                    if result >= 0:
+                        inserted = True
+                except Exception:
+                    pass
 
-                    if result < 0:
-                        smaller_font = max(6, font_size * 0.85)
+                # 第二次：缩小字号
+                if not inserted:
+                    smaller_font = max(6, font_size * 0.8)
+                    try:
                         page.insert_textbox(
-                            rect,
-                            processed_text,
-                            fontsize=smaller_font,
-                            fontname=fontname,
-                            fontfile=fontfile,
-                            color=(0, 0, 0),
-                            align=fitz.TEXT_ALIGN_LEFT,
+                            rect, processed_text, fontsize=smaller_font,
+                            fontname=fontname, fontfile=fontfile,
+                            color=(0, 0, 0), align=fitz.TEXT_ALIGN_LEFT,
                             lineheight=line_height
                         )
+                        inserted = True
+                    except Exception:
+                        pass
 
-                except Exception as e:
-                    print(f"插入文本失败 (block {block.id}): {e}")
+                # 第三次：用默认字体强制插入
+                if not inserted:
+                    try:
+                        page.insert_textbox(
+                            rect, processed_text, fontsize=max(6, font_size * 0.7),
+                            fontname=self.FONT_NAME, fontfile=self.font_path,
+                            color=(0, 0, 0), align=fitz.TEXT_ALIGN_LEFT,
+                            lineheight=1.1
+                        )
+                    except Exception as e:
+                        print(f"插入文本最终失败 (block {block.id}): {e}")
 
         # 保存时使用更高的 garbage 级别处理颜色空间问题
         try:

@@ -1100,7 +1100,8 @@
                 if (data.success) {
                     // 创建成功后自动下载
                     window.location.href = `/api/download-interleaved/${currentTaskId}`;
-                    btnText.textContent = '✓ 已下载';
+                    btnText.textContent = '下载对译';
+                    btn.disabled = false;
                 } else {
                     alert('创建失败: ' + data.error);
                     btn.disabled = false;
