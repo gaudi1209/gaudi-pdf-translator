@@ -253,3 +253,45 @@ def restore_formulas(text: str, formulas: List[Tuple[str, str]]) -> str:
     """恢复文本中的公式"""
     protector = FormulaProtector()
     return protector.restore(text, formulas)
+
+
+class InlineFormulaProtector:
+    """行内公式保护器 - 用占位符替换公式区域"""
+
+    def __init__(self):
+        pass
+
+    def protect_spans(self, text: str, formula_ranges: list) -> tuple:
+        """将指定范围替换为占位符
+
+        Args:
+            text: 完整文本
+            formula_ranges: [(start, end), ...] 公式位置列表
+
+        Returns:
+            (protected_text, placeholders) 其中 placeholders = [(placeholder, original), ...]
+        """
+        if not formula_ranges:
+            return text, []
+
+        # 按位置排序，从后向前替换
+        sorted_ranges = sorted(formula_ranges, key=lambda r: r[0], reverse=True)
+        placeholders = []
+        protected = text
+
+        for i, (start, end) in enumerate(sorted_ranges):
+            placeholder = f"___F{i}___"
+            original = text[start:end]
+            placeholders.append((placeholder, original))
+            protected = protected[:start] + placeholder + protected[end:]
+
+        # 顺序反转为正序
+        placeholders.reverse()
+        return protected, placeholders
+
+    def restore(self, text: str, placeholders: list) -> str:
+        """恢复占位符为原始公式"""
+        result = text
+        for placeholder, original in placeholders:
+            result = result.replace(placeholder, original)
+        return result

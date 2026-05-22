@@ -156,7 +156,9 @@ class PDFTranslationProcessor:
     def _translate_block(self, block: TextBlock) -> TextBlock:
         """翻译单个文本块"""
         if block.should_translate and block.text:
-            result = self.translator.translate_with_protection(block.text)
+            result = self.translator.translate_with_protection(
+                block.text, formula_spans=block.formula_spans
+            )
             if result.success:
                 block.translated_text = result.translated
             else:

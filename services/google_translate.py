@@ -192,7 +192,7 @@ class ProtectedTranslator:
 
         return text.strip()
 
-    def translate_with_protection(self, text: str) -> TranslationResult:
+    def translate_with_protection(self, text: str, formula_spans=None) -> TranslationResult:
         """翻译并保护公式，自动检测源语言"""
         if not text or not text.strip():
             return TranslationResult(original=text, translated=text, success=True)
@@ -203,17 +203,30 @@ class ProtectedTranslator:
             if cached is not None:
                 return TranslationResult(original=text, translated=cached, success=True)
 
-        # 1. 检测并保护公式
-        protected_text, formulas = self.formula_protector.protect(text)
+        # 1. 如果有 span 级公式标记，使用行内保护
+        if formula_spans:
+            from core.formula_detector import InlineFormulaProtector
+            inline_protector = InlineFormulaProtector()
+            ranges = [(s.start, s.end) for s in formula_spans]
+            protected_text, placeholders = inline_protector.protect_spans(text, ranges)
+        else:
+            # 回退到旧的整块保护
+            protected_text, formulas = self.formula_protector.protect(text)
+            placeholders = None
 
         # 2. 翻译保护后的文本（自动检测语言）
         result = self.translate_service.translate(protected_text)
 
         if result.success:
             # 3. 恢复公式
-            result.translated = self.formula_protector.restore(
-                result.translated, formulas
-            )
+            if formula_spans and placeholders:
+                result.translated = inline_protector.restore(
+                    result.translated, placeholders
+                )
+            else:
+                result.translated = self.formula_protector.restore(
+                    result.translated, formulas
+                )
             # 4. 规范化空格
             result.translated = self._normalize_spaces(result.translated)
 

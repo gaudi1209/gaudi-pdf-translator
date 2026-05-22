@@ -21,6 +21,14 @@ class BlockType(Enum):
 
 
 @dataclass
+class FormulaSpan:
+    """行内公式位置"""
+    start: int      # 在 text 中的起始位置
+    end: int        # 结束位置
+    text: str       # 公式原文
+
+
+@dataclass
 class TextBlock:
     """文本块数据结构"""
     id: str
@@ -33,6 +41,7 @@ class TextBlock:
     font_info: Dict = field(default_factory=dict)
     should_translate: bool = True
     image_data: Optional[bytes] = None
+    formula_spans: List['FormulaSpan'] = field(default_factory=list)
 
 
 @dataclass
@@ -731,6 +740,25 @@ class PDFParser:
 
             full_text = " ".join(full_text_parts)
 
+            # 记录数学字体 span 在 full_text 中的位置（用于行内公式保护）
+            formula_span_ranges = []
+            search_start = 0
+            for line in lines:
+                for span in line.get("spans", []):
+                    span_text = span.get("text", "").strip()
+                    if not span_text:
+                        continue
+                    font = span.get("font", "")
+                    if self.formula_detector.is_math_font(font):
+                        idx = full_text.find(span_text, search_start)
+                        if idx >= 0:
+                            formula_span_ranges.append(FormulaSpan(
+                                start=idx,
+                                end=idx + len(span_text),
+                                text=span_text
+                            ))
+                            search_start = idx + len(span_text)
+
             # 过滤太短的文本块（少于3个字符的跳过）
             if len(full_text.strip()) < 3:
                 continue
@@ -863,7 +891,8 @@ class PDFParser:
                 bbox=block_bbox,
                 page_num=page_num,
                 font_info=font_info,
-                should_translate=should_translate
+                should_translate=should_translate,
+                formula_spans=formula_span_ranges
             )
             blocks.append(text_block)
             block_idx += 1
