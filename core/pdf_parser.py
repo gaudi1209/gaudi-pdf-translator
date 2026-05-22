@@ -726,6 +726,64 @@ class PDFParser:
             except Exception:
                 pass
 
+        # 检测矢量绘图密集区域（路径聚类法）
+        try:
+            drawings = page.get_drawings()
+            if len(drawings) >= 10:  # 至少10条路径才值得分析
+                # 收集所有路径的包围盒
+                path_rects = []
+                for drawing in drawings:
+                    r = drawing.get("rect")
+                    if r and r.width > 2 and r.height > 2:
+                        path_rects.append((r.x0, r.y0, r.x1, r.y1))
+
+                if len(path_rects) >= 10:
+                    # 合并距离较近的矩形为区域
+                    # 使用简单的距离聚类：如果两个矩形的中心距离 < 100pt，合并
+                    clusters = []
+                    used = [False] * len(path_rects)
+
+                    for i in range(len(path_rects)):
+                        if used[i]:
+                            continue
+                        cluster = [path_rects[i]]
+                        used[i] = True
+                        changed = True
+                        while changed:
+                            changed = False
+                            # 计算当前聚类的包围盒
+                            cx0 = min(r[0] for r in cluster)
+                            cy0 = min(r[1] for r in cluster)
+                            cx1 = max(r[2] for r in cluster)
+                            cy1 = max(r[3] for r in cluster)
+
+                            for j in range(len(path_rects)):
+                                if used[j]:
+                                    continue
+                                rx0, ry0, rx1, ry1 = path_rects[j]
+                                # 计算路径矩形中心到聚类包围盒的距离
+                                rcx = (rx0 + rx1) / 2
+                                rcy = (ry0 + ry1) / 2
+                                # 如果路径在聚类包围盒的扩展范围内（80pt）
+                                if (cx0 - 80 <= rcx <= cx1 + 80 and
+                                    cy0 - 80 <= rcy <= cy1 + 80):
+                                    cluster.append(path_rects[j])
+                                    used[j] = True
+                                    changed = True
+
+                        if len(cluster) >= 8:  # 至少8条路径才算有效绘图区域
+                            x0 = min(r[0] for r in cluster)
+                            y0 = min(r[1] for r in cluster)
+                            x1 = max(r[2] for r in cluster)
+                            y1 = max(r[3] for r in cluster)
+                            # 区域面积至少占页面 2%
+                            area = (x1 - x0) * (y1 - y0)
+                            page_area = page.rect.width * page.rect.height
+                            if area > page_area * 0.02:
+                                figure_regions.append((x0 - 10, y0 - 10, x1 + 10, y1 + 10))
+        except Exception:
+            pass
+
         block_idx = 0
         for block in text_dict.get("blocks", []):
             # 图片块 - 跳过，后面统一处理

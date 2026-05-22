@@ -369,14 +369,22 @@ class PDFRebuilder:
 
     def _calculate_font_and_lineheight(self, text: str, width: float, height: float,
                                         original_size: float) -> tuple:
-        """计算合适的字体大小和行距 - 使用 TypesettingHelper 精确缩放"""
+        """计算合适的字体大小和行距"""
         if not text or width <= 0 or height <= 0:
             return 10, 1.2
 
+        line_height_ratio = 1.2
+
+        # 首先确保字号能放进框的高度（单行文本）
+        max_size_by_height = height / line_height_ratio
+        # 字号不能超过框高度
+        capped_size = min(original_size, max_size_by_height)
+
+        # 然后用 TypesettingHelper 检查宽度是否需要进一步缩放
         helper = TypesettingHelper()
-        scale = helper.calculate_optimal_scale(text, width, height, original_size)
-        final_size = max(8, original_size * scale)
-        return final_size, 1.2
+        scale = helper.calculate_optimal_scale(text, width, height, capped_size)
+        final_size = max(8, capped_size * scale)
+        return final_size, line_height_ratio
 
 
 class BilingualPDFRebuilder:
