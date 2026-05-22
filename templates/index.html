@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高迪PDF翻译工具</title>
+    <link rel="icon" href="/static/images/高迪字库图标.png">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* 高迪简约风格 - 参考高迪字库工具 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        /* 标题栏 */
+        .header {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #fff;
+            gap: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .header-icon {
+            height: 40px;
+            width: auto;
+        }
+
+        .header-title {
+            font-size: 20px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-left: auto;
+        }
+
+        /* 主容器 */
+        .main-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        /* 卡片 */
+        .card {
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        /* 功能介绍 */
+        .features {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 24px;
+        }
+
+        .feature-item {
+            flex: 1;
+            text-align: center;
+            padding: 16px;
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+
+        .feature-icon {
+            width: 24px;
+            height: 24px;
+            margin: 0 auto 8px;
+        }
+
+        .feature-icon svg {
+            width: 24px;
+            height: 24px;
+            stroke: #4a90a4;
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        .feature-item h5 {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .feature-item p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* 上传区域 */
+        .upload-zone {
+            border: 1px dashed #ccc;
+            border-radius: 6px;
+            padding: 40px;
+            text-align: center;
+            background-color: #fafafa;
+            transition: border-color 0.2s;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            border-color: #4a90a4;
+        }
+
+        .upload-zone .upload-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+        }
+
+        .upload-zone .upload-icon svg {
+            width: 48px;
+            height: 48px;
+            stroke: #999;
+            stroke-width: 1;
+            fill: none;
+        }
+
+        .upload-zone h4 {
+            font-size: 16px;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .upload-zone p {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 16px;
+        }
+
+        /* 按钮 */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-weight: 500;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background-color: #4a90a4;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: #3d7a8c;
+        }
+
+        .btn-success {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background-color: #219a52;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #5a6268;
+        }
+
+        .btn-outline {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            color: #666;
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background-color: #f0f0f0;
+        }
+
+        /* 文件信息 */
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .file-details {
+            flex: 1;
+        }
+
+        .file-name {
+            font-size: 16px;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .file-meta {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* 线程选择 */
+        .thread-selector {
+            background-color: #f5f5f5;
+            padding: 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .thread-selector label {
+            display: block;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .thread-btns {
+            display: flex;
+            gap: 5px;
+        }
+
+        .thread-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            color: #666;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .thread-btn:hover {
+            background-color: #f0f0f0;
+        }
+
+        .thread-btn.active {
+            background-color: #4a90a4;
+            color: white;
+            border-color: #4a90a4;
+        }
+
+        /* 进度区域 */
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .progress-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .status-badge {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .status-badge.processing {
+            background-color: #f0f0f0;
+            color: #666;
+        }
+
+        .status-badge.translating {
+            background-color: #e8f4f8;
+            color: #4a90a4;
+        }
+
+        .status-badge.rebuilding {
+            background-color: #e8f8ed;
+            color: #27ae60;
+        }
+
+        /* 进度条 */
+        .progress {
+            height: 6px;
+            background-color: #e0e0e0;
+            border-radius: 3px;
+            margin-bottom: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #4a90a4;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .progress-message {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .progress-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .progress-info span {
+            display: inline-flex;
+            gap: 4px;
+        }
+
+        .progress-info strong {
+            color: #333;
+        }
+
+        /* 统计信息 */
+        .stats-info {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .stats-info .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stats-info .stat-item strong {
+            color: #4a90a4;
+        }
+
+        /* 结果区域 */
+        .result-content {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .result-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+        }
+
+        .result-icon svg {
+            width: 48px;
+            height: 48px;
+            stroke: #27ae60;
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        .result-title {
+            font-size: 18px;
+            color: #27ae60;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .result-message {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .result-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        #bilingualSection {
+            padding-top: 10px;
+        }
+
+        /* 错误区域 */
+        .error-icon svg {
+            stroke: #e74c3c;
+        }
+
+        .error-title {
+            color: #e74c3c;
+        }
+
+        /* 页脚 */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #999;
+        }
+
+        /* 隐藏 */
+        .hidden {
+            display: none !important;
+        }
+
+        /* 模态框 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            border: 1px solid #e8e6e1;
+            border-radius: 6px;
+            width: 90%;
+            max-width: 480px;
+            max-height: 90vh;
+            overflow: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e8e6e1;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: #666;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 20px;
+            border-top: 1px solid #e8e6e1;
+        }
+
+        .file-select-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .file-input-display {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #e8e6e1;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #666;
+            background-color: #f8f7f5;
+        }
+
+        /* 响应式 */
+        @media (max-width: 600px) {
+            .features {
+                flex-direction: column;
+            }
+            .file-info {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .file-actions {
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 标题栏 -->
+    <div class="header">
+        <img src="/static/images/高迪字库图标.png" class="header-icon" alt="图标">
+        <span class="header-title">高迪PDF翻译工具</span>
+        <span class="header-subtitle">英文/德文 → 中文</span>
+    </div>
+
+    <div class="main-container">
+        <!-- 功能介绍 -->
+        <div class="features">
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+                </div>
+                <h5>公式保护</h5>
+                <p>自动识别保持原样</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                </div>
+                <h5>图表保持</h5>
+                <p>保持原始图表不变</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                <h5>多线程加速</h5>
+                <p>并行翻译提升效率</p>
+            </div>
+        </div>
+
+        <!-- 下载区域（始终可见） -->
+        <div id="downloadSection" class="card">
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <span style="font-size: 16px; color: #333; font-weight: 500;">下载选项：</span>
+                <a href="#" class="btn btn-success" id="downloadBtn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.5; fill: none;">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/>
+                        <line x1="9" y1="15" x2="12" y2="12"/>
+                        <line x1="15" y1="15" x2="12" y2="12"/>
+                    </svg>
+                    <span id="downloadBtnText">下载译文</span>
+                </a>
+                <button class="btn btn-primary" id="downloadBilingualBtn" onclick="downloadBilingual()" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.5; fill: none;">
+                        <rect x="2" y="3" width="8" height="18" rx="1"/>
+                        <rect x="14" y="3" width="8" height="18" rx="1"/>
+                        <line x1="5" y1="7" x2="7" y2="7"/>
+                        <line x1="5" y1="11" x2="7" y2="11"/>
+                        <line x1="5" y1="15" x2="7" y2="15"/>
+                        <line x1="17" y1="7" x2="19" y2="7"/>
+                        <line x1="17" y1="11" x2="19" y2="11"/>
+                        <line x1="17" y1="15" x2="19" y2="15"/>
+                    </svg>
+                    <span id="bilingualBtnText">下载对译</span>
+                </button>
+                <button class="btn btn-secondary" onclick="showRebuildModal()" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.5; fill: none;">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="15"/>
+                        <polyline points="9 15 12 18 15 15"/>
+                    </svg>
+                    对译重建
+                </button>
+                <span id="downloadHint" style="font-size: 13px; color: #999; margin-left: 10px;">（翻译完成后可用）</span>
+            </div>
+        </div>
+
+        <!-- 对译重建模态框 -->
+        <div id="rebuildModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>对译重建</h3>
+                    <button class="modal-close" onclick="hideRebuildModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="color: #666; margin-bottom: 20px;">选择已有的原文PDF和译文PDF，重建为交错对译PDF。</p>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-size: 14px; color: #333; margin-bottom: 8px; font-weight: 500;">
+                            原文 PDF
+                        </label>
+                        <div class="file-select-row">
+                            <input type="file" id="rebuildOriginal" accept=".pdf" style="display: none;">
+                            <input type="text" id="rebuildOriginalName" readonly placeholder="未选择文件" class="file-input-display">
+                            <button class="btn btn-outline" onclick="document.getElementById('rebuildOriginal').click()">选择</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-size: 14px; color: #333; margin-bottom: 8px; font-weight: 500;">
+                            译文 PDF
+                        </label>
+                        <div class="file-select-row">
+                            <input type="file" id="rebuildTranslated" accept=".pdf" style="display: none;">
+                            <input type="text" id="rebuildTranslatedName" readonly placeholder="未选择文件" class="file-input-display">
+                            <button class="btn btn-outline" onclick="document.getElementById('rebuildTranslated').click()">选择</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" onclick="hideRebuildModal()">取消</button>
+                    <button class="btn btn-primary" id="rebuildBtn" onclick="rebuildBilingual()">
+                        <span id="rebuildBtnText">开始重建</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 上传区域 -->
+        <div id="uploadSection" class="card">
+            <div class="upload-zone" id="dropZone">
+                <div class="upload-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/>
+                        <line x1="9" y1="15" x2="12" y2="12"/>
+                        <line x1="15" y1="15" x2="12" y2="12"/>
+                    </svg>
+                </div>
+                <h4>拖拽 PDF 文件到此处</h4>
+                <p>或点击选择文件（最大 200MB）</p>
+                <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">选择文件</button>
+            </div>
+        </div>
+
+        <!-- 文件信息和设置 -->
+        <div id="fileInfo" class="card hidden">
+            <div class="file-info">
+                <div class="file-details">
+                    <div class="file-name" id="fileName"></div>
+                    <div class="file-meta">共 <span id="pageCount"></span> 页</div>
+                </div>
+                <div class="file-actions">
+                    <button class="btn btn-outline btn-sm" onclick="resetUpload()">更换文件</button>
+                </div>
+            </div>
+
+            <div class="thread-selector" style="margin-top: 20px;">
+                <label>并行线程数</label>
+                <div class="thread-btns">
+                    <button class="thread-btn" data-value="3">3</button>
+                    <button class="thread-btn" data-value="5">5</button>
+                    <button class="thread-btn active" data-value="10">10</button>
+                </div>
+            </div>
+
+            <button class="btn btn-success" style="width: 100%;" id="startBtn">开始翻译</button>
+        </div>
+
+        <!-- 进度区域 -->
+        <div id="progressSection" class="card hidden">
+            <div class="progress-header">
+                <span class="progress-title">翻译进度</span>
+                <span class="status-badge processing" id="statusBadge">处理中</span>
+            </div>
+            <div class="progress">
+                <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+            </div>
+            <div class="progress-message" id="progressMessage">正在准备...</div>
+            <div class="progress-info">
+                <span>页面: <strong><span id="currentPage">0</span>/<span id="totalPages">0</span></strong></span>
+                <span>文本块: <strong><span id="currentBlock">0</span>/<span id="totalBlocks">0</span></strong></span>
+            </div>
+            <div class="stats-info" id="statsInfo">
+                <div class="stat-item">⏱️ 时长: <strong id="duration">0秒</strong></div>
+                <div class="stat-item">📝 字数: <strong id="charCount">0</strong></div>
+                <div class="stat-item">📄 翻译: <strong id="translatedBlocks">0</strong> 块</div>
+                <div class="stat-item">⏭️ 跳过: <strong id="skippedBlocks">0</strong> 块</div>
+            </div>
+        </div>
+
+        <!-- 结果区域 -->
+        <div id="resultSection" class="card hidden">
+            <div class="result-content">
+                <div class="result-icon">
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div class="result-title">翻译完成</div>
+                <div class="result-message" id="resultMessage">您的 PDF 文件已成功翻译</div>
+                <div class="stats-info" id="resultStats" style="justify-content: center; margin-bottom: 20px;">
+                    <div class="stat-item">⏱️ 时长: <strong id="resultDuration">-</strong></div>
+                    <div class="stat-item">📝 字数: <strong id="resultChars">0</strong></div>
+                    <div class="stat-item">📄 翻译: <strong id="resultTranslated">0</strong> 块</div>
+                    <div class="stat-item">⏭️ 跳过: <strong id="resultSkipped">0</strong> 块</div>
+                </div>
+                <div class="result-actions">
+                    <button class="btn btn-outline" onclick="location.reload()" style="display: inline-flex; align-items: center; gap: 6px;">
+                        <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.5; fill: none;">
+                            <path d="M23 4v6h-6"/>
+                            <path d="M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        翻译新文件
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 错误区域 -->
+        <div id="errorSection" class="card hidden">
+            <div class="result-content">
+                <div class="result-icon error-icon">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                </div>
+                <div class="result-title error-title">翻译失败</div>
+                <div class="result-message" id="errorMessage"></div>
+                <button class="btn btn-primary" onclick="location.reload()">重试</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">高迪PDF翻译工具 | 基于 Ollama 本地模型</div>
+
+    <script>
+        let currentTaskId = null;
+        let progressInterval = null;
+        let threadCount = 10;
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        // 初始禁用下载按钮
+        function initDownloadButtons() {
+            const downloadBtn = document.getElementById('downloadBtn');
+            const bilingualBtn = document.getElementById('downloadBilingualBtn');
+            downloadBtn.classList.add('disabled');
+            downloadBtn.style.pointerEvents = 'none';
+            downloadBtn.style.opacity = '0.5';
+            bilingualBtn.disabled = true;
+        }
+        initDownloadButtons();
+
+        // 启用下载按钮
+        function enableDownloadButtons() {
+            const downloadBtn = document.getElementById('downloadBtn');
+            const bilingualBtn = document.getElementById('downloadBilingualBtn');
+            const hint = document.getElementById('downloadHint');
+            downloadBtn.classList.remove('disabled');
+            downloadBtn.style.pointerEvents = 'auto';
+            downloadBtn.style.opacity = '1';
+            bilingualBtn.disabled = false;
+            hint.textContent = '（已就绪）';
+            hint.style.color = '#27ae60';
+        }
+
+        // 线程选择
+        document.querySelectorAll('.thread-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.thread-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                threadCount = parseInt(btn.dataset.value);
+            });
+        });
+
+        // 拖放
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        async function handleFile(file) {
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                alert('请上传 PDF 文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    currentTaskId = data.task_id;
+                    document.getElementById('fileName').textContent = data.filename;
+                    document.getElementById('pageCount').textContent = data.page_count;
+                    document.getElementById('uploadSection').classList.add('hidden');
+                    document.getElementById('fileInfo').classList.remove('hidden');
+                } else {
+                    alert('上传失败: ' + data.error);
+                }
+            } catch (error) {
+                alert('上传失败: ' + error.message);
+            }
+        }
+
+        function resetUpload() {
+            currentTaskId = null;
+            document.getElementById('fileInfo').classList.add('hidden');
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('fileInput').value = '';
+        }
+
+        document.getElementById('startBtn').addEventListener('click', async () => {
+            if (!currentTaskId) return;
+
+            try {
+                const response = await fetch(`/api/translate/${currentTaskId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({max_workers: threadCount})
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('fileInfo').classList.add('hidden');
+                    document.getElementById('progressSection').classList.remove('hidden');
+                    progressInterval = setInterval(checkProgress, 500);
+                }
+            } catch (error) {
+                alert('启动翻译失败: ' + error.message);
+            }
+        });
+
+        async function checkProgress() {
+            if (!currentTaskId) return;
+
+            try {
+                const response = await fetch(`/api/status/${currentTaskId}`);
+                const data = await response.json();
+
+                if (data.progress) {
+                    updateProgress(data.progress);
+                }
+
+                if (data.status === 'completed') {
+                    clearInterval(progressInterval);
+                    showResult();
+                } else if (data.status === 'failed') {
+                    clearInterval(progressInterval);
+                    showError(data.error);
+                }
+            } catch (error) {
+                console.error('获取进度失败:', error);
+            }
+        }
+
+        function updateProgress(progress) {
+            const percent = progress.total_blocks > 0
+                ? Math.round(progress.current_block / progress.total_blocks * 100)
+                : 0;
+
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressMessage').textContent = progress.message;
+            document.getElementById('currentPage').textContent = progress.current_page;
+            document.getElementById('totalPages').textContent = progress.total_pages;
+            document.getElementById('currentBlock').textContent = progress.current_block;
+            document.getElementById('totalBlocks').textContent = progress.total_blocks;
+
+            // 更新统计信息
+            if (progress.stats) {
+                document.getElementById('duration').textContent = progress.stats.duration_formatted || '0秒';
+                document.getElementById('charCount').textContent = progress.stats.total_chars || 0;
+                document.getElementById('translatedBlocks').textContent = progress.stats.translated_blocks || 0;
+                document.getElementById('skippedBlocks').textContent = progress.stats.skipped_blocks || 0;
+            }
+
+            const badge = document.getElementById('statusBadge');
+            if (progress.status === 'translating') {
+                badge.className = 'status-badge translating';
+                badge.textContent = '翻译中';
+            } else if (progress.status === 'rebuilding') {
+                badge.className = 'status-badge rebuilding';
+                badge.textContent = '重建PDF';
+            }
+        }
+
+        function showResult() {
+            document.getElementById('progressSection').classList.add('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+            document.getElementById('downloadBtn').href = `/api/download/${currentTaskId}`;
+
+            // 启用顶部下载按钮
+            enableDownloadButtons();
+
+            // 从进度区域复制统计信息到结果区域
+            document.getElementById('resultDuration').textContent = document.getElementById('duration').textContent;
+            document.getElementById('resultChars').textContent = document.getElementById('charCount').textContent;
+            document.getElementById('resultTranslated').textContent = document.getElementById('translatedBlocks').textContent;
+            document.getElementById('resultSkipped').textContent = document.getElementById('skippedBlocks').textContent;
+        }
+
+        async function downloadBilingual() {
+            if (!currentTaskId) return;
+
+            const btn = document.getElementById('downloadBilingualBtn');
+            const btnText = document.getElementById('bilingualBtnText');
+            const originalText = btnText.textContent;
+            btn.disabled = true;
+            btnText.textContent = '生成中...';
+
+            try {
+                // 先创建中英对照PDF
+                const response = await fetch(`/api/create-interleaved/${currentTaskId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    // 创建成功后自动下载
+                    window.location.href = `/api/download-interleaved/${currentTaskId}`;
+                    btnText.textContent = '✓ 已下载';
+                } else {
+                    alert('创建失败: ' + data.error);
+                    btn.disabled = false;
+                    btnText.textContent = originalText;
+                }
+            } catch (error) {
+                alert('创建失败: ' + error.message);
+                btn.disabled = false;
+                btnText.textContent = originalText;
+            }
+        }
+
+        // 对译重建模态框
+        function showRebuildModal() {
+            document.getElementById('rebuildModal').classList.remove('hidden');
+            // 重置表单
+            document.getElementById('rebuildOriginal').value = '';
+            document.getElementById('rebuildTranslated').value = '';
+            document.getElementById('rebuildOriginalName').value = '';
+            document.getElementById('rebuildTranslatedName').value = '';
+            document.getElementById('rebuildBtnText').textContent = '开始重建';
+            document.getElementById('rebuildBtn').disabled = false;
+        }
+
+        function hideRebuildModal() {
+            document.getElementById('rebuildModal').classList.add('hidden');
+        }
+
+        // 文件选择监听
+        document.getElementById('rebuildOriginal').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : '';
+            document.getElementById('rebuildOriginalName').value = fileName;
+        });
+
+        document.getElementById('rebuildTranslated').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : '';
+            document.getElementById('rebuildTranslatedName').value = fileName;
+        });
+
+        // 对译重建
+        async function rebuildBilingual() {
+            const originalFile = document.getElementById('rebuildOriginal').files[0];
+            const translatedFile = document.getElementById('rebuildTranslated').files[0];
+
+            if (!originalFile || !translatedFile) {
+                alert('请选择原文和译文PDF文件');
+                return;
+            }
+
+            const btn = document.getElementById('rebuildBtn');
+            const btnText = document.getElementById('rebuildBtnText');
+            btn.disabled = true;
+            btnText.textContent = '处理中...';
+
+            try {
+                const formData = new FormData();
+                formData.append('original', originalFile);
+                formData.append('translated', translatedFile);
+
+                const response = await fetch('/api/rebuild-bilingual', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    hideRebuildModal();
+                    window.location.href = data.download_url;
+                } else {
+                    alert('重建失败: ' + data.error);
+                    btn.disabled = false;
+                    btnText.textContent = '开始重建';
+                }
+            } catch (error) {
+                alert('重建失败: ' + error.message);
+                btn.disabled = false;
+                btnText.textContent = '开始重建';
+            }
+        }
+
+        function showError(error) {
+            document.getElementById('progressSection').classList.add('hidden');
+            document.getElementById('errorSection').classList.remove('hidden');
+            document.getElementById('errorMessage').textContent = error || '未知错误';
+        }
+    </script>
+</body>
+</html>

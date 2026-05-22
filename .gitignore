@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 数据和输出（不含源码）
+output/*.pdf
+static/uploads/*.pdf
+temp/
+data/sessions/
+
+# 系统文件
+nul
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
