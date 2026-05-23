@@ -14,14 +14,16 @@
 
 ## 功能
 
-1. **智能内容保护** — 自动识别并跳过公式（LaTeX 数学字体、Unicode 符号）、矢量图区域（路径聚类检测）、参考文献（支持 `[1]`、`1.`、ACM/SIGGRAPH 三种引文格式）、目录、附录、Index
-2. **双语对译** — 原文页与译文页交错排列，方便对照阅读；也支持下载纯翻译版
-3. **多引擎支持** — Ollama 本地模型 / OpenAI 兼容 API（DeepSeek、智谱、任意兼容端点），Web 界面一键切换
-4. **翻译缓存** — SQLite 缓存，相同段落不重复调用模型，支持"强制重翻"忽略缓存
-5. **多线程并行** — 3/5/10 线程可选，大幅加速翻译
-6. **排版对齐** — CJK 禁则处理、自适应字号缩放、多字体映射（衬线→宋体、无衬线→雅黑）、高度约束防溢出
-7. **断点续传** — 页面级别进度跟踪，中断后可继续翻译
-8. **轻量部署** — 仅依赖 Flask + PyMuPDF + requests，无需 Redis/Celery
+1. **文档结构识别** — 翻译前先扫描全文，建立文档结构树（封面→目录→正文章节→附录→Index），基于结构做翻译决策，常识验证确保识别合理
+2. **智能内容保护** — 自动跳过公式（LaTeX 数学字体、Unicode 符号）、矢量图区域（路径聚类检测）、参考文献（`[1]`、`1.`、ACM/SIGGRAPH 三种引文格式）、目录、附录、Index
+3. **行内公式保护** — 段落内的公式用占位符替换，只翻译文字部分，翻译后还原公式
+4. **双语对译** — 原文页与译文页交错排列，方便对照阅读；也支持下载纯翻译版
+5. **多引擎支持** — Ollama 本地模型 / OpenAI 兼容 API（DeepSeek、智谱、任意兼容端点），Web 界面一键切换
+6. **翻译缓存** — SQLite 缓存，相同段落不重复调用模型，支持"强制重翻"忽略缓存
+7. **多线程并行** — 3/5/10 线程可选，大幅加速翻译
+8. **排版对齐** — CJK 禁则处理、自适应字号缩放、多字体映射（衬线→宋体、无衬线→雅黑）、高度约束防溢出
+9. **断点续传** — 按章节分批处理，页面级别进度跟踪，中断后可继续翻译
+10. **轻量部署** — 仅依赖 Flask + PyMuPDF + requests，无需 Redis/Celery
 
 ## 与 [BabelDOC](https://github.com/funstory-ai/BabelDOC) 的区别
 
@@ -64,18 +66,37 @@ pdf翻译/
 ├── app.py                      # Flask Web 服务
 ├── config.py                   # 配置
 ├── core/
-│   ├── pdf_parser.py           # PDF 解析（文本块、图片、公式、参考文献检测）
-│   └── pdf_rebuilder.py        # PDF 重建（翻译文本回写、排版、双语生成）
+│   ├── pdf_parser.py           # PDF 解析（文档结构识别 + 文本块分类 + 公式/图片检测）
+│   ├── pdf_rebuilder.py        # PDF 重建（翻译文本回写、排版、双语生成）
+│   ├── processor.py            # 翻译流水线（按章节分批、断点续传）
+│   └── progress_manager.py     # 进度管理
 ├── services/
 │   ├── google_translate.py     # Ollama 翻译 + 公式保护
 │   ├── openai_translate.py     # OpenAI 兼容 API 翻译
 │   ├── translation_cache.py    # SQLite 翻译缓存
-│   └── formula_detector.py     # 公式检测器
+│   └── formula_detector.py     # 行内公式保护器
 ├── templates/
 │   └── index.html              # Web 界面
 └── data/
     └── cache/
         └── translation_cache.db
+```
+
+### 文档结构识别流程
+
+```
+parse()
+  ├─ _scan_document_structure()     快速全文扫描，建立文档结构树
+  │    ├─ 封面/前置区域（TOC 之前）
+  │    ├─ 目录区域（is_toc_page 检测）
+  │    ├─ 正文区域（章节标题 → 章内 References）
+  │    └─ 末尾区域（Index / Appendix）
+  ├─ _validate_document_structure() 常识验证（TOC 在前 30%，Index 在后 20%）
+  ├─ _parse_page(section_type)      按结构类型处理每页
+  │    ├─ cover / toc / backmatter → 整页跳过
+  │    ├─ chapter_refs → 只跳过引用条目
+  │    └─ chapter → 段落级分类（标题/公式/代码/正文）
+  └─ _detect_chapters_from_structure()  基于结构信息检测章节边界
 ```
 
 ## 效果
