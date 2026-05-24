@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高迪PDF翻译工具</title>
+    <title>高迪翻译工具</title>
     <link rel="icon" href="/static/images/高迪字库图标.png">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -730,9 +730,9 @@
                         <line x1="15" y1="15" x2="12" y2="12"/>
                     </svg>
                 </div>
-                <h4>拖拽 PDF 文件到此处</h4>
+                <h4>拖拽 PDF / EPUB 文件到此处</h4>
                 <p>或点击选择文件（最大 200MB）</p>
-                <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+                <input type="file" id="fileInput" accept=".pdf,.epub" style="display: none;">
                 <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">选择文件</button>
             </div>
         </div>
@@ -742,7 +742,7 @@
             <div class="file-info">
                 <div class="file-details">
                     <div class="file-name" id="fileName"></div>
-                    <div class="file-meta">共 <span id="pageCount"></span> 页</div>
+                    <div class="file-meta">共 <span id="pageCount"></span> <span id="pageUnit">页</span></div>
                 </div>
                 <div class="file-actions">
                     <button class="btn btn-outline btn-sm" onclick="resetUpload()">更换文件</button>
@@ -795,7 +795,7 @@
                     <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
                 <div class="result-title">翻译完成</div>
-                <div class="result-message" id="resultMessage">您的 PDF 文件已成功翻译</div>
+                <div class="result-message" id="resultMessage">翻译完成</div>
                 <div class="stats-info" id="resultStats" style="justify-content: center; margin-bottom: 20px;">
                     <div class="stat-item">⏱️ 时长: <strong id="resultDuration">-</strong></div>
                     <div class="stat-item">📝 字数: <strong id="resultChars">0</strong></div>
@@ -832,6 +832,7 @@
 
     <script>
         let currentTaskId = null;
+        let currentFileType = 'pdf';
         let progressInterval = null;
         let threadCount = 10;
         let selectedEngine = 'ollama';
@@ -911,7 +912,16 @@
             downloadBtn.classList.remove('disabled');
             downloadBtn.style.pointerEvents = 'auto';
             downloadBtn.style.opacity = '1';
-            bilingualBtn.disabled = false;
+
+            // EPUB 本身就是双语版，不需要对译按钮
+            if (currentFileType === 'epub') {
+                bilingualBtn.style.display = 'none';
+                document.getElementById('downloadBtnText').textContent = '下载双语 EPUB';
+            } else {
+                bilingualBtn.style.display = '';
+                bilingualBtn.disabled = false;
+            }
+
             hint.textContent = '（已就绪）';
             hint.style.color = '#27ae60';
         }
@@ -946,8 +956,8 @@
         });
 
         async function handleFile(file) {
-            if (!file.name.toLowerCase().endsWith('.pdf')) {
-                alert('请上传 PDF 文件');
+            if (!file.name.toLowerCase().match(/\.(pdf|epub)$/)) {
+                alert('请上传 PDF 或 EPUB 文件');
                 return;
             }
 
@@ -963,8 +973,10 @@
 
                 if (data.success) {
                     currentTaskId = data.task_id;
+                    currentFileType = data.file_type || 'pdf';
                     document.getElementById('fileName').textContent = data.filename;
                     document.getElementById('pageCount').textContent = data.page_count;
+                    document.getElementById('pageUnit').textContent = data.file_type === 'epub' ? '个章节' : '页';
                     document.getElementById('uploadSection').classList.add('hidden');
                     document.getElementById('fileInfo').classList.remove('hidden');
                 } else {

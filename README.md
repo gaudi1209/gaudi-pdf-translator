@@ -1,29 +1,41 @@
-# 高迪 PDF 翻译工具
+# 高迪翻译工具
 
 <p align="center">
   <img src="docs/img/web-ui.png" width="700" alt="Web 界面">
 </p>
 
-本地化 PDF 全文翻译工具，面向学术论文和技术文档设计。优先适配本地大模型（Ollama），同时支持 OpenAI 兼容 API（DeepSeek、智谱等）。
+本地化全文翻译工具，支持 **PDF** 和 **EPUB** 格式。面向学术论文和技术文档设计。优先适配本地大模型（Ollama），同时支持 OpenAI 兼容 API（DeepSeek、智谱等）。
 
 ## 为什么需要它
 
-大型 PDF 全文翻译是常见需求，但学术文档包含大量不适合翻译的内容：公式、矢量图标注、参考文献、目录、附录等。通用翻译工具会破坏这些内容或丢失排版。
+大型文档全文翻译是常见需求，但学术文档包含大量不适合翻译的内容：公式、矢量图标注、参考文献、目录、附录等。通用翻译工具会破坏这些内容或丢失排版。
 
-本工具在翻译前先解析 PDF 结构，智能识别并保护这些区域，只翻译正文段落，译文尽量与原文对齐。
+本工具在翻译前先解析文档结构，智能识别并保护这些区域，只翻译正文段落，译文尽量与原文对齐。
 
 ## 功能
+
+### PDF 翻译
 
 1. **文档结构识别** — 翻译前先扫描全文，建立文档结构树（封面→目录→正文章节→附录→Index），基于结构做翻译决策，常识验证确保识别合理
 2. **智能内容保护** — 自动跳过公式（LaTeX 数学字体、Unicode 符号）、矢量图区域（路径聚类检测）、参考文献（`[1]`、`1.`、ACM/SIGGRAPH 三种引文格式）、目录、附录、Index
 3. **行内公式保护** — 段落内的公式用占位符替换，只翻译文字部分，翻译后还原公式
 4. **双语对译** — 原文页与译文页交错排列，方便对照阅读；也支持下载纯翻译版
-5. **多引擎支持** — Ollama 本地模型 / OpenAI 兼容 API（DeepSeek、智谱、任意兼容端点），Web 界面一键切换
-6. **翻译缓存** — SQLite 缓存，相同段落不重复调用模型，支持"强制重翻"忽略缓存
-7. **多线程并行** — 3/5/10 线程可选，大幅加速翻译
-8. **排版对齐** — CJK 禁则处理、自适应字号缩放、多字体映射（衬线→宋体、无衬线→雅黑）、高度约束防溢出
-9. **断点续传** — 按章节分批处理，页面级别进度跟踪，中断后可继续翻译
-10. **轻量部署** — 仅依赖 Flask + PyMuPDF + requests，无需 Redis/Celery
+5. **排版对齐** — CJK 禁则处理、自适应字号缩放、多字体映射（衬线→宋体、无衬线→雅黑）、高度约束防溢出
+
+### EPUB 翻译
+
+6. **双语 EPUB** — 解析电子书章节，逐段翻译，生成原文+译文对照的双语 EPUB
+7. **精准段落提取** — 只提取 body 直接子元素中的段落标签，避免嵌套元素（如 span）导致译文错位
+8. **串行翻译** — API 调用加锁，防止并行翻译导致结果错位
+9. **进度同步** — EPUB 翻译进度实时同步到 Web 界面进度条
+
+### 通用功能
+
+10. **多引擎支持** — Ollama 本地模型 / OpenAI 兼容 API（DeepSeek、智谱、任意兼容端点），Web 界面一键切换
+11. **翻译缓存** — SQLite 缓存，相同段落不重复调用模型，支持"强制重翻"忽略缓存
+12. **多线程并行** — 3/5/10 线程可选，大幅加速翻译
+13. **断点续传** — 按章节分批处理，页面级别进度跟踪，中断后可继续翻译（PDF）
+14. **轻量部署** — 仅依赖 Flask + PyMuPDF + requests + ebooklib，无需 Redis/Celery
 
 ## 与 [BabelDOC](https://github.com/funstory-ai/BabelDOC) 的区别
 
@@ -32,6 +44,7 @@
 | | 本工具 | BabelDOC |
 |---|---|---|
 | 部署 | 本地单进程，`python app.py` | 需要 Docker 或较多配置 |
+| 格式 | PDF + EPUB | PDF |
 | 依赖 | Flask + PyMuPDF + requests | 较多 Python 包 |
 | 界面 | Web UI（拖拽上传、实时进度） | 命令行为主 |
 | 模型 | 优先本地 Ollama，兼容 API | 以 API 为主 |
@@ -41,7 +54,7 @@
 
 ```bash
 # 安装依赖
-pip install flask pymupdf requests
+pip install flask pymupdf requests ebooklib beautifulsoup4 lxml
 
 # 启动（默认端口 6500）
 python app.py
@@ -68,13 +81,14 @@ pdf翻译/
 ├── core/
 │   ├── pdf_parser.py           # PDF 解析（文档结构识别 + 文本块分类 + 公式/图片检测）
 │   ├── pdf_rebuilder.py        # PDF 重建（翻译文本回写、排版、双语生成）
-│   ├── processor.py            # 翻译流水线（按章节分批、断点续传）
+│   ├── processor.py            # PDF 翻译流水线（按章节分批、断点续传）
+│   ├── ebook_processor.py      # EPUB 翻译（解析、翻译、双语重建）
+│   ├── formula_detector.py     # 行内公式保护器
 │   └── progress_manager.py     # 进度管理
 ├── services/
 │   ├── google_translate.py     # Ollama 翻译 + 公式保护
 │   ├── openai_translate.py     # OpenAI 兼容 API 翻译
-│   ├── translation_cache.py    # SQLite 翻译缓存
-│   └── formula_detector.py     # 行内公式保护器
+│   └── translation_cache.py    # SQLite 翻译缓存
 ├── templates/
 │   └── index.html              # Web 界面
 └── data/

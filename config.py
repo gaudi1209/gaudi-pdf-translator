@@ -54,7 +54,8 @@ TRANSLATION_CACHE_DIR = os.path.join(BASE_DIR, 'data', 'cache')
 
 def allowed_file(filename):
     """检查文件扩展名"""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    return ext in ('pdf', 'epub')
 
 
 def ensure_dirs():

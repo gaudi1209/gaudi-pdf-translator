@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import *
 from config import load_settings, save_settings
 from core.processor import PDFTranslationProcessor, ProcessingStatus
+from core.ebook_processor import EbookTranslator, EbookStatus
 
 # 确保目录存在
 ensure_dirs()
@@ -68,7 +69,7 @@ def api_save_settings():
 
 @app.route('/api/upload', methods=['POST'])
 def upload():
-    """上传 PDF 文件"""
+    """上传文件（PDF / EPUB）"""
     if 'file' not in request.files:
         return jsonify({'error': '没有上传文件'}), 400
 
@@ -76,8 +77,9 @@ def upload():
     if file.filename == '':
         return jsonify({'error': '没有选择文件'}), 400
 
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({'error': '只支持 PDF 文件'}), 400
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in ('pdf', 'epub'):
+        return jsonify({'error': '只支持 PDF 和 EPUB 文件'}), 400
 
     # 生成任务ID
     task_id = str(uuid.uuid4())
@@ -85,20 +87,28 @@ def upload():
     # 保存文件
     filename = secure_filename(file.filename)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    saved_name = f"{task_id}_{timestamp}.pdf"
+    saved_name = f"{task_id}_{timestamp}.{ext}"
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], saved_name)
     file.save(filepath)
 
-    # 获取PDF页数
-    doc = fitz.open(filepath)
-    page_count = len(doc)
-    doc.close()
+    # 获取文件信息
+    file_type = ext
+    page_count = 0
+    if ext == 'pdf':
+        doc = fitz.open(filepath)
+        page_count = len(doc)
+        doc.close()
+    elif ext == 'epub':
+        from ebooklib import epub as epublib
+        book = epublib.read_epub(filepath)
+        page_count = sum(1 for item in book.get_items() if item.get_type() == 9)
 
     # 存储任务信息
     with tasks_lock:
         tasks[task_id] = {
             'filename': filename,
             'filepath': filepath,
+            'file_type': file_type,
             'page_count': page_count,
             'status': 'uploaded',
             'created_at': datetime.now().isoformat(),
@@ -109,6 +119,7 @@ def upload():
         'success': True,
         'task_id': task_id,
         'filename': filename,
+        'file_type': file_type,
         'page_count': page_count
     })
 
@@ -127,7 +138,12 @@ def start_translation(task_id):
     max_workers = data.get('max_workers', 10)  # 并行线程数
 
     # 输出文件路径
-    output_name = f"translated_{task['filename']}"
+    file_type = task.get('file_type', 'pdf')
+    base_name = task['filename'].rsplit('.', 1)[0]
+    if file_type == 'epub':
+        output_name = f"bilingual_{base_name}.epub"
+    else:
+        output_name = f"translated_{task['filename']}"
     output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_name)
 
     # 更新状态
@@ -165,16 +181,31 @@ def start_translation(task_id):
 
             ignore_cache = data.get('ignore_cache', False)
 
-            processor = PDFTranslationProcessor(
-                task['filepath'],
-                output_path,
-                max_workers=max_workers,
-                data_dir=DATA_FOLDER,
-                translation_config=translation_config,
-                ignore_cache=ignore_cache
-            )
-            processor.set_progress_callback(progress_callback)
-            processor.process(task_id=task_id)  # 传递task_id支持断点续传
+            if file_type == 'epub':
+                # EPUB 翻译
+                from services.google_translate import get_translator
+                cache_dir = os.path.join(os.path.dirname(DATA_FOLDER), 'cache') if DATA_FOLDER else None
+                if ignore_cache:
+                    cache_dir = None
+                config = dict(translation_config or {})
+                config['cache_dir'] = cache_dir
+                translator = get_translator(**config)
+
+                ebook_translator = EbookTranslator(translator, max_workers=max_workers)
+                ebook_translator.set_progress_callback(progress_callback)
+                ebook_translator.translate_epub(task['filepath'], output_path)
+            else:
+                # PDF 翻译
+                processor = PDFTranslationProcessor(
+                    task['filepath'],
+                    output_path,
+                    max_workers=max_workers,
+                    data_dir=DATA_FOLDER,
+                    translation_config=translation_config,
+                    ignore_cache=ignore_cache
+                )
+                processor.set_progress_callback(progress_callback)
+                processor.process(task_id=task_id)
 
             with tasks_lock:
                 if task_id in tasks:
@@ -231,10 +262,11 @@ def download(task_id):
     if not output_path or not os.path.exists(output_path):
         return jsonify({'error': '文件不存在'}), 404
 
+    base_name = task['filename'].rsplit('.', 1)[0]
     return send_file(
         output_path,
         as_attachment=True,
-        download_name=f"translated_{task['filename']}"
+        download_name=f"bilingual_{base_name}.{task.get('file_type', 'pdf')}"
     )
 
 
